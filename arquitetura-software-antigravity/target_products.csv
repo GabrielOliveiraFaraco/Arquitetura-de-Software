@@ -1,0 +1,6 @@
+product_hash,category,search_term,required_keywords,banned_keywords
+p_quest3_512,Acessórios & Hardware,Meta Quest 3 512GB,"quest,3,512gb","strap,case,capa,alça,arma,suporte,bateria,nike,tênis,acessório,controle"
+p_quest3s,Acessórios & Hardware,Meta Quest 3S,"quest,3s","strap,case,capa,alça,arma,suporte,bateria,óculos,nike,tênis,acessório,controle"
+p_quest2,Acessórios & Hardware,Meta Quest 2 128GB,"quest,2","strap,case,capa,alça,arma,suporte,bateria,óculos,3s,nike,tênis,acessório,controle"
+p_ps5_slim_dig,Consoles,PlayStation 5 Slim Edição Digital,"playstation,5,digital","suporte,base,cabo,jogo,leitor,drive,adesivo,capa"
+p_g29,Volantes,Volante Logitech G29,"volante,logitech,g29","placa,adaptador,presilha,câmbio,pedal,suporte,fonte"

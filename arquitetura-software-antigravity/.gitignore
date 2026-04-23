@@ -1,0 +1,22 @@
+# Ambientes Virtuais (Dependências)
+venv/
+.venv/
+env/
+.env/
+
+# Cache do Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Arquivos de IDEs e Editores
+.vscode/
+.idea/
+.DS_Store
+
+# Bancos de Dados e Cargas de Execução Mapeadas (Opcional, mas recomendado para evitar commits sujos)
+*.db
+*.sqlite3
+amazon_offers_history.db
+debug_amazon.html
+cheapest_offers.json
