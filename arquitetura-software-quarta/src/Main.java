@@ -1,88 +1,106 @@
+import domain.Preco;
 import domain.Produto;
+import infra.HibernateUtil;
+import service.PrecoService;
 import service.ProdutoService;
+import service.ServiceInterface;
 
 void main() {
     ProdutoService service = new ProdutoService();
+    PrecoService precoService = new PrecoService();
 
-    UUID id = new UUID(1, 1);
-    Produto produto = new Produto(
-            id,
-            "436274623",
-            "Play5",
-            "Sony",
-            "VideoGame",
-            4000f);
-
-    service.list();
-
-    boolean isGoing = true;
-
-    while (isGoing){
-        int escolha = Integer.parseInt(IO.readln("Escolha uma ação: 1 - Adicionar, 2 - Remover, 3 - Listar, 4 - Editar, 0 - Sair: "));
-        switch (escolha) {
-            case 1:
-                UUID id2 = new UUID(2 ,2);
-                String sku = IO.readln("SKU: ");
-                String nome = IO.readln("Nome: ");
-                String marca = IO.readln("Marca: ");
-                String descricao = IO.readln("Descrição: ");
-                Float preco = Float.parseFloat(IO.readln("Preço: "));
-                Produto produto1 = new Produto(id2, sku, nome, marca, descricao, preco);
-                produto1.setId(id2);
-                service.add(produto1);
-                break;
-            case 2:
-                String skuRemove = IO.readln("Digite o SKU que deseja deletar: ");
-                Produto produtoRemove = service.buscarPorSku(skuRemove);
-                if (produtoRemove != null) {
-                    service.remove(produtoRemove);
-                    IO.println("Produto removido com sucesso!");
-                } else {
-                    IO.println("Produto não encontrado com o SKU informado.");
-                }
-                break;
-            case 3:
-                service.list();
-                break;
-            case 4:
-                String skuParaEditar = IO.readln("Digite o SKU do produto que deseja editar: ");
-                Produto produtoExistente = service.buscarPorSku(skuParaEditar);
-
-                if (produtoExistente != null) {
-                    String novoSku = IO.readln("Novo SKU (deixe em branco para manter): ");
-                    String novoNome = IO.readln("Novo nome: ");
-                    String novaMarca = IO.readln("Nova marca: ");
-                    String novaDescricao = IO.readln("Nova descrição: ");
-                    Float novoPreco = Float.parseFloat(IO.readln("Novo preço: "));
-
-                    if (novoSku.trim().isEmpty()) novoSku = produtoExistente.getSku();
-                    if (novoNome.trim().isEmpty()) novoNome = produtoExistente.getNome();
-                    if (novaMarca.trim().isEmpty()) novaMarca = produtoExistente.getMarca();
-                    if (novaDescricao.trim().isEmpty()) novaDescricao = produtoExistente.getDescricao();
-                    if (novoPreco == null || novoPreco == 0) novoPreco = produtoExistente.getPreco();
-
-                    Produto produtoEditado = new Produto(
-                            produtoExistente.getId(),
-                            novoSku,
-                            novoNome,
-                            novaMarca,
-                            novaDescricao,
-                            novoPreco
-                    );
-
-                    service.edit(produtoEditado, produtoExistente.getId());
-                    IO.println("Produto editado com sucesso!");
-                } else {
-                    IO.println("Produto não encontrado!");
-                }
-                break;
-            case 0:
-                IO.println("Saindo...");
-                isGoing = false;
-                break;
-
+    try {
+        boolean menuAtivo = true;
+        while (menuAtivo) {
+            int opcaoSelecionada = menu();
+            switch (opcaoSelecionada) {
+                case 1:
+                    adicionarProduto(service);
+                    break;
+                case 2:
+                    listarProdutos(service);
+                    break;
+                case 3:
+                    editarProdutos(service);
+                    break;
+                case 4:
+                    deletarProdutos(service);
+                    break;
+                case 5:
+                    editarPreco(precoService);
+                    break;
+                case 0:
+                    menuAtivo = false;
+                    break;
+            }
         }
-
+    } finally {
+        HibernateUtil.shutdown();
     }
+}
 
+public void adicionarProduto(ServiceInterface service) {
+    String sku = IO.readln("Digite a SKU do produto: ");
+    String nome = IO.readln("Digite o nome do produto: ");
+    String marca = IO.readln("Digite a marca do produto: ");
+    String descricao = IO.readln("Digite a descricao do produto: ");
+    Float preco = Float.parseFloat(IO.readln("Digite o preco do produto: "));
+
+    Produto produto = new Produto(sku, nome, marca, descricao, preco);
+
+    service.add(produto);
+}
+
+public void listarProdutos(ServiceInterface service) {
+    service.list();
+}
+
+public void editarProdutos(ServiceInterface service) {
+    System.out.println("Atualmente temos os seguintes produtos cadastrados: ");
+    service.list();
+    int indice = Integer.parseInt(IO.readln("Digite o indice do produto que deseja editar"));
+
+    Produto produto = (Produto) service.findByIndex(indice);
+    produto.setSku(IO.readln("Informe o novo SKU do produto: "));
+    produto.setNome(IO.readln("Informe o novo nome do produto: "));
+    produto.setDescricao(IO.readln("Informe a nova descricao do produto: "));
+    produto.setMarca(IO.readln("Informe a nova marca do produto: "));
+    produto.setPreco(Float.parseFloat(IO.readln("Informe o novo preco do produto: ")));
+
+    service.edit(produto, produto.getId());
+}
+
+public void deletarProdutos(ServiceInterface service) {
+    System.out.println("Atualmente temos os seguintes produtos cadastrados: ");
+    service.list();
+    int indice = Integer.parseInt(IO.readln("Digite o indice do produto que deseja deletar: "));
+    Produto produto = (Produto) service.findByIndex(indice);
+    service.remove(produto);
+}
+
+public void editarPreco(ServiceInterface precoService) {
+    System.out.println("Atualmente temos os seguintes preços no histórico: ");
+    precoService.list();
+    int indice = Integer.parseInt(IO.readln("Digite o indice do preço que deseja editar: "));
+    
+    Preco preco = (Preco) precoService.findByIndex(indice);
+    if (preco != null) {
+        preco.setPreco(Float.parseFloat(IO.readln("Informe o novo valor para o preço: ")));
+        precoService.edit(preco, preco.getId());
+    } else {
+        System.out.println("Preço não encontrado no indice especificado.");
+    }
+}
+
+public Integer menu() {
+    System.out.println("Digite a opção desejada: ");
+    System.out.println("1 = Adicionar um novo produto");
+    System.out.println("2 = Listar os produtos");
+    System.out.println("3 = Editar um produto");
+    System.out.println("4 = Deletar um produto");
+    System.out.println("5 = Editar um preço");
+    System.out.println("0 = Sair");
+
+    int opcao = Integer.parseInt(IO.readln());
+    return opcao;
 }

@@ -1,0 +1,9 @@
+domain\EntityInterface.class
+Main.class
+service\ServiceInterface.class
+infra\HibernateUtil.class
+IO.class
+service\PrecoService.class
+service\ProdutoService.class
+domain\Preco.class
+domain\Produto.class

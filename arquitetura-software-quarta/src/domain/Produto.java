@@ -1,22 +1,54 @@
 package domain;
 
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
-public class Produto implements EntityInterface{
+@Entity
+@Table(name = "produto")
+public class Produto implements EntityInterface {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "id", length = 36, nullable = false, updatable = false)
     private UUID id;
+
+    @Column(name = "sku", length = 64, nullable = false, unique = true)
     private String sku;
+
+    @Column(name = "nome", length = 255, nullable = false)
     private String nome;
+
+    @Column(name = "marca", length = 128)
     private String marca;
+
+    @Column(name = "descricao", length = 1024)
     private String descricao;
+
+    @Column(name = "preco", nullable = false)
     private Float preco;
-    private ArrayList<Preco> historicoDePrecos;
+
+    @OneToMany(
+            mappedBy = "produto",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            fetch = FetchType.LAZY)
+    private List<Preco> historicoDePrecos = new ArrayList<>();
 
     public Produto() {
     }
 
-    public Produto(UUID id, String sku, String nome, String marca, String descricao, Float preco) {
+    public Produto(String sku, String nome, String marca, String descricao, Float preco) {
         this.sku = sku;
         this.nome = nome;
         this.marca = marca;
@@ -32,20 +64,20 @@ public class Produto implements EntityInterface{
         this.id = id;
     }
 
-    public String getNome() {
-        return nome;
-    }
-
-    public void setNome(String nome) {
-        this.nome = nome;
-    }
-
     public String getSku() {
         return sku;
     }
 
     public void setSku(String sku) {
         this.sku = sku;
+    }
+
+    public String getNome() {
+        return nome;
+    }
+
+    public void setNome(String nome) {
+        this.nome = nome;
     }
 
     public String getMarca() {
@@ -72,11 +104,11 @@ public class Produto implements EntityInterface{
         this.preco = preco;
     }
 
-    public ArrayList<Preco> getHistoricoDePrecos() {
+    public List<Preco> getHistoricoDePrecos() {
         return historicoDePrecos;
     }
 
-    public void setHistoricoDePrecos(ArrayList<Preco> historicoDePrecos) {
+    public void setHistoricoDePrecos(List<Preco> historicoDePrecos) {
         this.historicoDePrecos = historicoDePrecos;
     }
 
@@ -89,7 +121,6 @@ public class Produto implements EntityInterface{
                 ", marca='" + marca + '\'' +
                 ", descricao='" + descricao + '\'' +
                 ", preco=" + preco +
-                ", historicoDePrecos=" + historicoDePrecos +
                 '}';
     }
 }
