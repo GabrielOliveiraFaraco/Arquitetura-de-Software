@@ -1,3 +1,5 @@
+# Gabriel Faraco & Larissa Reis
+
 # Rastreador de Preços de Produtos
 
 Sistema em Java que cadastra produtos com **vários links de lojas**, executa um **crawler** para buscar preços em cada link, compara os valores e salva o **menor preço** no histórico (com nome da loja).
