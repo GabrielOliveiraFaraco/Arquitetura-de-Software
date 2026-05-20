@@ -1,0 +1,16 @@
+{
+  "nome": "PlayStation 5",
+  "sku": "PS5-DISC",
+  "marca": "Sony",
+  "descricao": "Console PlayStation 5 com leitor de discos",
+  "links": [
+    {
+      "loja": "Amazon",
+      "url": "https://www.amazon.com.br/dp/EXEMPLO"
+    },
+    {
+      "loja": "Kabum",
+      "url": "https://www.kabum.com.br/produto/EXEMPLO"
+    }
+  ]
+}
