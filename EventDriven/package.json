@@ -1,0 +1,17 @@
+{
+  "name": "pedra-papel-tesoura-multiplayer",
+  "version": "1.0.0",
+  "description": "Jogo multiplayer de Pedra, Papel e Tesoura com arquitetura Event-Driven via Socket.IO",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["socket.io", "websocket", "event-driven", "multiplayer", "game"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2"
+  }
+}

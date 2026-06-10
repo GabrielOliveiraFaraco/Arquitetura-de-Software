@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pedra, Papel e Tesoura — Multiplayer</title>
+  <meta name="description" content="Jogo multiplayer de Pedra, Papel e Tesoura com arquitetura orientada a eventos via WebSockets." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ══════════════════════════════════════════════════════
+       DESIGN SYSTEM — tokens e variáveis globais
+    ══════════════════════════════════════════════════════ */
+    :root {
+      --bg:          #0d0f1a;
+      --surface:     #161929;
+      --surface2:    #1e2235;
+      --border:      rgba(255,255,255,0.08);
+
+      --p1:          #6c63ff;   /* roxo — Jogador 1 */
+      --p1-glow:     rgba(108,99,255,0.35);
+      --p2:          #ff6584;   /* rosa — Jogador 2 */
+      --p2-glow:     rgba(255,101,132,0.35);
+      --accent:      #43e97b;   /* verde — vitória */
+      --warn:        #f9c74f;   /* amarelo — empate */
+      --danger:      #f44336;   /* vermelho */
+
+      --text:        #e8eaf6;
+      --muted:       #7986cb;
+
+      --radius:      16px;
+      --radius-sm:   10px;
+      --shadow:      0 8px 32px rgba(0,0,0,0.5);
+      --trans:       0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* ══════════════════════════════════════════════════════
+       RESET & BASE
+    ══════════════════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      background-image:
+        radial-gradient(ellipse at 20% 10%, rgba(108,99,255,0.12) 0%, transparent 55%),
+        radial-gradient(ellipse at 80% 90%, rgba(255,101,132,0.10) 0%, transparent 55%);
+    }
+
+    /* ══════════════════════════════════════════════════════
+       CARD PRINCIPAL
+    ══════════════════════════════════════════════════════ */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      width: 100%;
+      max-width: 540px;
+      padding: 2.5rem 2rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Barra colorida no topo — muda conforme o jogador */
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--p1), var(--p2));
+      border-radius: var(--radius) var(--radius) 0 0;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       HEADER
+    ══════════════════════════════════════════════════════ */
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    header h1 {
+      font-size: 1.75rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--p1), var(--p2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.5px;
+    }
+
+    header p.subtitle {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 0.35rem;
+    }
+
+    /* Badge do jogador */
+    .player-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 1rem;
+      border-radius: 99px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-top: 0.75rem;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      opacity: 0;
+      transition: opacity var(--trans);
+    }
+    .player-badge.show { opacity: 1; }
+    .player-badge.p1 { background: var(--p1-glow); color: var(--p1); border: 1px solid var(--p1); }
+    .player-badge.p2 { background: var(--p2-glow); color: var(--p2); border: 1px solid var(--p2); }
+
+    /* ══════════════════════════════════════════════════════
+       SEÇÕES / SCREENS
+    ══════════════════════════════════════════════════════ */
+    .screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+      animation: fadeIn 0.4s ease;
+    }
+    .screen.active { display: flex; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ══════════════════════════════════════════════════════
+       TELA: LOBBY (conectar / aguardar)
+    ══════════════════════════════════════════════════════ */
+    .lobby-icon {
+      font-size: 4rem;
+      line-height: 1;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50%       { transform: scale(1.08); }
+    }
+
+    .status-msg {
+      text-align: center;
+      font-size: 1rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .status-msg strong { color: var(--text); }
+
+    /* Spinner de espera */
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--p1);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ══════════════════════════════════════════════════════
+       BOTÃO PRINCIPAL
+    ══════════════════════════════════════════════════════ */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.8rem 2rem;
+      border-radius: var(--radius-sm);
+      border: none;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform var(--trans), box-shadow var(--trans), opacity var(--trans);
+      text-decoration: none;
+    }
+
+    .btn:active { transform: scale(0.96); }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--p1), #8b85ff);
+      color: #fff;
+      box-shadow: 0 4px 20px var(--p1-glow);
+    }
+    .btn-primary:hover {
+      box-shadow: 0 6px 28px var(--p1-glow);
+      transform: translateY(-2px);
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, #43e97b, #38f9d7);
+      color: #0d1a12;
+      box-shadow: 0 4px 20px rgba(67,233,123,0.3);
+    }
+    .btn-success:hover {
+      box-shadow: 0 6px 28px rgba(67,233,123,0.4);
+      transform: translateY(-2px);
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none !important;
+      box-shadow: none !important;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       TELA: JOGO — botões de escolha
+    ══════════════════════════════════════════════════════ */
+    .choices-label {
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+    }
+
+    .choices-grid {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .choice-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 1.25rem 1.5rem;
+      border-radius: var(--radius);
+      border: 2px solid var(--border);
+      background: var(--surface2);
+      cursor: pointer;
+      transition: all var(--trans);
+      color: var(--text);
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 0.9rem;
+      min-width: 100px;
+    }
+
+    .choice-btn .emoji { font-size: 2.5rem; line-height: 1; }
+
+    .choice-btn:hover:not(:disabled) {
+      border-color: var(--p1);
+      box-shadow: 0 0 0 4px var(--p1-glow), 0 8px 24px rgba(0,0,0,0.3);
+      transform: translateY(-4px) scale(1.04);
+      background: rgba(108,99,255,0.12);
+    }
+
+    .choice-btn:active:not(:disabled) { transform: scale(0.97); }
+
+    .choice-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .choice-btn.selected {
+      border-color: var(--p1);
+      background: rgba(108,99,255,0.18);
+      box-shadow: 0 0 0 3px var(--p1-glow);
+    }
+
+    /* ══════════════════════════════════════════════════════
+       TELA: RESULTADO
+    ══════════════════════════════════════════════════════ */
+    .result-banner {
+      text-align: center;
+      padding: 1rem 1.5rem;
+      border-radius: var(--radius);
+      font-size: 1.2rem;
+      font-weight: 700;
+      width: 100%;
+      animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(0.7); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    .result-banner.win   { background: rgba(67,233,123,0.15); border: 1px solid var(--accent); color: var(--accent); }
+    .result-banner.lose  { background: rgba(244,67,54,0.12);  border: 1px solid var(--danger); color: #ff6b6b; }
+    .result-banner.draw  { background: rgba(249,199,79,0.12); border: 1px solid var(--warn);   color: var(--warn); }
+
+    /* Placar de escolhas */
+    .choices-display {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .player-choice {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 1rem;
+      border-radius: var(--radius);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+    }
+
+    .player-choice .p-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .player-choice.p1-color .p-label { color: var(--p1); }
+    .player-choice.p2-color .p-label { color: var(--p2); }
+
+    .player-choice .p-emoji { font-size: 2.8rem; line-height: 1; }
+    .player-choice .p-name  { font-size: 0.85rem; color: var(--muted); font-weight: 500; }
+
+    .vs-badge {
+      font-weight: 800;
+      font-size: 1.1rem;
+      color: var(--muted);
+      padding: 0.5rem;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       LOG DE EVENTOS (painel de debug / pedagógico)
+    ══════════════════════════════════════════════════════ */
+    .log-panel {
+      width: 100%;
+      max-width: 540px;
+      margin-top: 1.5rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+
+    .log-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.65rem 1rem;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .log-header .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: blink 1.4s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.2; }
+    }
+
+    .log-body {
+      max-height: 160px;
+      overflow-y: auto;
+      padding: 0.5rem 0;
+      font-size: 0.75rem;
+      font-family: 'Courier New', monospace;
+    }
+
+    .log-body::-webkit-scrollbar { width: 4px; }
+    .log-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+    .log-entry {
+      padding: 0.25rem 1rem;
+      color: var(--muted);
+      line-height: 1.5;
+      border-left: 2px solid transparent;
+      transition: background var(--trans);
+    }
+
+    .log-entry:hover { background: var(--surface2); }
+
+    .log-entry .ts   { color: rgba(121,134,203,0.6); margin-right: 0.4rem; }
+    .log-entry.emit  { border-left-color: var(--p1); color: #a5b4fc; }
+    .log-entry.recv  { border-left-color: var(--accent); color: #86efac; }
+    .log-entry.info  { border-left-color: var(--warn); color: var(--warn); }
+    .log-entry.error { border-left-color: var(--danger); color: #f87171; }
+
+    /* ══════════════════════════════════════════════════════
+       RESPONSIVIDADE
+    ══════════════════════════════════════════════════════ */
+    @media (max-width: 480px) {
+      .card { padding: 2rem 1.25rem; }
+      .choices-grid { gap: 0.75rem; }
+      .choice-btn { min-width: 80px; padding: 1rem; }
+      .choice-btn .emoji { font-size: 2rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ══════════════════════════════════════
+       CARD PRINCIPAL DO JOGO
+  ══════════════════════════════════════ -->
+  <div class="card" id="game-card">
+    <header>
+      <h1>✊ Pedra, Papel e Tesoura</h1>
+      <p class="subtitle">Multiplayer via WebSockets · Arquitetura Event-Driven</p>
+      <!-- Badge dinâmico que mostra qual jogador você é -->
+      <div class="player-badge" id="player-badge"></div>
+    </header>
+
+    <!-- ── TELA 1: LOBBY ─────────────────────────────── -->
+    <section class="screen active" id="screen-lobby" role="region" aria-label="Lobby">
+      <div class="lobby-icon">🎮</div>
+      <div class="status-msg" id="lobby-msg">
+        <strong>Conectando ao servidor...</strong>
+      </div>
+      <div class="spinner" id="lobby-spinner" style="display:none"></div>
+      <button class="btn btn-primary" id="btn-join" style="display:none" onclick="joinRoom()">
+        Entrar na Partida
+      </button>
+    </section>
+
+    <!-- ── TELA 2: JOGO (escolha) ────────────────────── -->
+    <section class="screen" id="screen-game" role="region" aria-label="Jogo ativo">
+      <p class="choices-label">Faça sua escolha</p>
+      <div class="choices-grid">
+        <button class="choice-btn" id="btn-pedra"   onclick="sendChoice('pedra')">
+          <span class="emoji">✊</span>Pedra
+        </button>
+        <button class="choice-btn" id="btn-papel"   onclick="sendChoice('papel')">
+          <span class="emoji">✋</span>Papel
+        </button>
+        <button class="choice-btn" id="btn-tesoura" onclick="sendChoice('tesoura')">
+          <span class="emoji">✌️</span>Tesoura
+        </button>
+      </div>
+      <p class="status-msg" id="game-status" style="display:none"></p>
+    </section>
+
+    <!-- ── TELA 3: RESULTADO ──────────────────────────── -->
+    <section class="screen" id="screen-result" role="region" aria-label="Resultado">
+      <div class="result-banner" id="result-banner"></div>
+      <div class="choices-display">
+        <div class="player-choice p1-color">
+          <span class="p-label">Jogador 1</span>
+          <span class="p-emoji" id="res-p1-emoji"></span>
+          <span class="p-name"  id="res-p1-name"></span>
+        </div>
+        <span class="vs-badge">VS</span>
+        <div class="player-choice p2-color">
+          <span class="p-label">Jogador 2</span>
+          <span class="p-emoji" id="res-p2-emoji"></span>
+          <span class="p-name"  id="res-p2-name"></span>
+        </div>
+      </div>
+      <button class="btn btn-success" id="btn-play-again" onclick="playAgain()">
+        🔄 Jogar Novamente
+      </button>
+    </section>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       PAINEL DE LOG DE EVENTOS (pedagógico)
+  ══════════════════════════════════════ -->
+  <div class="log-panel">
+    <div class="log-header" onclick="toggleLog()">
+      <span>📡 Log de Eventos Socket.IO</span>
+      <span class="dot"></span>
+    </div>
+    <div class="log-body" id="event-log"></div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════
+       SOCKET.IO CLIENT
+       Servido automaticamente pelo servidor
+  ══════════════════════════════════════ -->
+  <script src="/socket.io/socket.io.js"></script>
+
+  <script>
+    /* ══════════════════════════════════════════════════════
+       ESTADO LOCAL DO CLIENTE
+       Apenas informações de UI: número do jogador e sala.
+       A lógica do jogo vive 100% no servidor.
+    ══════════════════════════════════════════════════════ */
+    const state = {
+      socket: null,
+      roomId: null,
+      playerNumber: null,
+      hasChosen: false,
+    };
+
+    /* Mapa de emojis para cada escolha */
+    const EMOJIS = { pedra: '✊', papel: '✋', tesoura: '✌️' };
+
+    /* ══════════════════════════════════════════════════════
+       UTILITÁRIOS DE UI
+    ══════════════════════════════════════════════════════ */
+
+    /** Exibe apenas a tela com o id especificado */
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    /** Habilita ou desabilita os botões de escolha */
+    function setChoicesEnabled(enabled) {
+      ['btn-pedra', 'btn-papel', 'btn-tesoura'].forEach(id => {
+        document.getElementById(id).disabled = !enabled;
+      });
+    }
+
+    /** Limpa a seleção visual dos botões */
+    function clearChoiceSelection() {
+      document.querySelectorAll('.choice-btn').forEach(b => b.classList.remove('selected'));
+    }
+
+    /** Atualiza o badge de jogador no header */
+    function setPlayerBadge(playerNumber) {
+      const badge = document.getElementById('player-badge');
+      badge.textContent = `Jogador ${playerNumber}`;
+      badge.className = `player-badge show p${playerNumber}`;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       PAINEL DE LOG DE EVENTOS
+    ══════════════════════════════════════════════════════ */
+    function log(msg, type = 'info') {
+      const logBody = document.getElementById('event-log');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      const ts = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      entry.innerHTML = `<span class="ts">${ts}</span>${msg}`;
+      logBody.appendChild(entry);
+      logBody.scrollTop = logBody.scrollHeight; // Auto-scroll
+    }
+
+    function toggleLog() {
+      const body = document.getElementById('event-log');
+      body.style.display = body.style.display === 'none' ? '' : 'none';
+    }
+
+    /* ══════════════════════════════════════════════════════
+       CONEXÃO SOCKET.IO
+    ══════════════════════════════════════════════════════ */
+    function connect() {
+      /**
+       * Conecta ao servidor Socket.IO.
+       * O endereço é relativo — funciona em qualquer porta.
+       */
+      state.socket = io();
+
+      log('🔌 Conectando ao servidor...', 'info');
+
+      // ── Evento recebido: connect (nativo do Socket.IO) ─────────────────
+      state.socket.on('connect', () => {
+        log(`✅ Conectado! Socket ID: ${state.socket.id}`, 'recv');
+        document.getElementById('lobby-msg').innerHTML =
+          `<strong>Conectado!</strong><br>Clique no botão para entrar na fila.`;
+        document.getElementById('btn-join').style.display = '';
+      });
+
+      // ── Evento recebido: disconnect (nativo do Socket.IO) ──────────────
+      state.socket.on('disconnect', () => {
+        log('❌ Desconectado do servidor.', 'error');
+        document.getElementById('lobby-msg').innerHTML =
+          '<strong>Desconectado.</strong> Recarregue a página.';
+        document.getElementById('btn-join').style.display = 'none';
+        document.getElementById('lobby-spinner').style.display = 'none';
+        showScreen('screen-lobby');
+      });
+
+      // ────────────────────────────────────────────────────────────────────
+      // EVENTOS DO SERVIDOR → CLIENTE
+      // Cada handler abaixo reage a um evento enviado pelo servidor.
+      // ────────────────────────────────────────────────────────────────────
+
+      // ── Evento recebido: waitingOpponent ───────────────────────────────
+      /**
+       * O servidor informa que este cliente está aguardando um oponente.
+       * Mostramos o spinner e uma mensagem de espera.
+       */
+      state.socket.on('waitingOpponent', ({ message }) => {
+        log(`📥 [waitingOpponent] ${message}`, 'recv');
+        document.getElementById('lobby-msg').innerHTML =
+          `<strong>${message}</strong><br>Abra outra aba para o Jogador 2!`;
+        document.getElementById('lobby-spinner').style.display = '';
+        document.getElementById('btn-join').style.display = 'none';
+        showScreen('screen-lobby');
+      });
+
+      // ── Evento recebido: gameStart ─────────────────────────────────────
+      /**
+       * O servidor informa que a partida começou (ou uma nova rodada iniciou).
+       * Recebemos o número do jogador e o ID da sala.
+       */
+      state.socket.on('gameStart', ({ roomId, playerNumber, message }) => {
+        log(`📥 [gameStart] Sala: ${roomId} | ${message}`, 'recv');
+
+        // Atualiza estado local (apenas UI/identidade, nunca lógica de jogo)
+        state.roomId = roomId;
+        state.playerNumber = playerNumber;
+        state.hasChosen = false;
+
+        setPlayerBadge(playerNumber);
+        clearChoiceSelection();
+        setChoicesEnabled(true);
+
+        // Reseta o botão "Jogar Novamente" para o estado original.
+        // Sem isso, da 2ª rodada em diante o botão chega desabilitado
+        // na tela de resultado (pois playAgain() o desabilita e nunca reseta).
+        const btnPlayAgain = document.getElementById('btn-play-again');
+        btnPlayAgain.disabled = false;
+        btnPlayAgain.textContent = '🔄 Jogar Novamente';
+
+        const gameStatus = document.getElementById('game-status');
+        gameStatus.style.display = 'none';
+
+        showScreen('screen-game');
+      });
+
+      // ── Evento recebido: waitingOpponentChoice ─────────────────────────
+      /**
+       * O servidor informa que este jogador já escolheu e está aguardando
+       * o oponente. Desabilitamos os botões e mostramos a mensagem.
+       */
+      state.socket.on('waitingOpponentChoice', ({ message }) => {
+        log(`📥 [waitingOpponentChoice] ${message}`, 'recv');
+        setChoicesEnabled(false);
+        const gameStatus = document.getElementById('game-status');
+        gameStatus.textContent = message;
+        gameStatus.style.display = '';
+        showScreen('screen-game');
+      });
+
+      // ── Evento recebido: result ────────────────────────────────────────
+      /**
+       * O servidor envia o resultado completo da rodada.
+       * Exibimos as escolhas de ambos os jogadores e o vencedor.
+       */
+      state.socket.on('result', ({ player1Choice, player2Choice, winner, message }) => {
+        log(`📥 [result] ${message} | P1: ${player1Choice} | P2: ${player2Choice}`, 'recv');
+
+        // Preenche os emojis e nomes das escolhas
+        document.getElementById('res-p1-emoji').textContent = EMOJIS[player1Choice] || '❓';
+        document.getElementById('res-p1-name').textContent  = player1Choice;
+        document.getElementById('res-p2-emoji').textContent = EMOJIS[player2Choice] || '❓';
+        document.getElementById('res-p2-name').textContent  = player2Choice;
+
+        // Define a classe visual do banner de resultado
+        const banner = document.getElementById('result-banner');
+        banner.textContent = message;
+
+        if (winner === 'draw') {
+          banner.className = 'result-banner draw';
+        } else {
+          const iWon = (winner === 'player1' && state.playerNumber === 1) ||
+                       (winner === 'player2' && state.playerNumber === 2);
+          banner.className = `result-banner ${iWon ? 'win' : 'lose'}`;
+        }
+
+        showScreen('screen-result');
+      });
+
+      // ── Evento recebido: opponentDisconnected ──────────────────────────
+      /**
+       * O servidor informa que o oponente desconectou.
+       * Voltamos ao lobby e exibimos a mensagem.
+       */
+      state.socket.on('opponentDisconnected', ({ message }) => {
+        log(`📥 [opponentDisconnected] ${message}`, 'error');
+
+        state.roomId = null;
+        state.playerNumber = null;
+        state.hasChosen = false;
+
+        document.getElementById('lobby-msg').innerHTML =
+          `<strong>😕 Oponente desconectou.</strong><br>${message}`;
+        document.getElementById('lobby-spinner').style.display = 'none';
+        document.getElementById('btn-join').style.display = 'none';
+
+        // O servidor já recolocou este jogador na fila
+        const badge = document.getElementById('player-badge');
+        badge.className = 'player-badge';
+
+        showScreen('screen-lobby');
+      });
+    }
+
+    /* ══════════════════════════════════════════════════════
+       AÇÕES DO CLIENTE → SERVIDOR
+       Cada função emite um evento para o servidor.
+    ══════════════════════════════════════════════════════ */
+
+    /**
+     * Emite o evento [joinRoom] para solicitar entrada em uma sala.
+     * Chamado quando o jogador clica em "Entrar na Partida".
+     */
+    function joinRoom() {
+      log('📤 [joinRoom] Solicitando entrada na sala...', 'emit');
+      state.socket.emit('joinRoom');
+    }
+
+    /**
+     * Emite o evento [playerChoice] com a escolha do jogador.
+     * A lógica de vitória é calculada exclusivamente no servidor.
+     * @param {string} choice - 'pedra' | 'papel' | 'tesoura'
+     */
+    function sendChoice(choice) {
+      if (state.hasChosen || !state.roomId) return;
+      state.hasChosen = true;
+
+      // Feedback visual imediato (apenas UI)
+      clearChoiceSelection();
+      const map = { pedra: 'btn-pedra', papel: 'btn-papel', tesoura: 'btn-tesoura' };
+      document.getElementById(map[choice]).classList.add('selected');
+
+      log(`📤 [playerChoice] Escolha enviada: "${choice}"`, 'emit');
+      state.socket.emit('playerChoice', { roomId: state.roomId, choice });
+    }
+
+    /**
+     * Emite o evento [playAgain] para solicitar uma nova rodada.
+     * Ambos os jogadores precisam solicitar para a rodada reiniciar.
+     */
+    function playAgain() {
+      if (!state.roomId) return;
+      log('📤 [playAgain] Solicitando nova rodada...', 'emit');
+      document.getElementById('btn-play-again').disabled = true;
+      document.getElementById('btn-play-again').textContent = '⏳ Aguardando oponente...';
+      state.socket.emit('playAgain', { roomId: state.roomId });
+    }
+
+    /* ══════════════════════════════════════════════════════
+       INICIALIZAÇÃO
+    ══════════════════════════════════════════════════════ */
+    connect();
+  </script>
+</body>
+</html>
